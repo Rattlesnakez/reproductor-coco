@@ -149,8 +149,13 @@
           album: 'Radio en vivo',
           artwork: [
             {
-              src: new URL('./logo.png', window.location.href).href,
-              sizes: '304x277',
+              src: new URL('./icon-192.png', window.location.href).href,
+              sizes: '192x192',
+              type: 'image/png',
+            },
+            {
+              src: new URL('./icon-512.png', window.location.href).href,
+              sizes: '512x512',
               type: 'image/png',
             },
           ],
