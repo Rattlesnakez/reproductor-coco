@@ -1,0 +1,17 @@
+{
+  "name": "Reproductor Coco",
+  "short_name": "Reproductor Coco",
+  "description": "Estación de radio arcade en vivo — Reproductor Coco",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#D81B7E",
+  "theme_color": "#D81B7E",
+  "icons": [
+    {
+      "src": "./logo.png",
+      "sizes": "304x277",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}
