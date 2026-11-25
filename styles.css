@@ -599,19 +599,6 @@ body.has-started .secondary-controls {
   outline-offset: 3px;
 }
 
-/* Keep YouTube player rendered in-viewport behind opaque bg-gradient */
-.yt-host {
-  position: fixed;
-  right: 8px;
-  bottom: 8px;
-  width: 200px;
-  height: 112px;
-  opacity: 0.001;
-  pointer-events: none;
-  z-index: 0;
-  overflow: hidden;
-}
-
 /* Phone-first ergonomics */
 @media (max-width: 600px) {
   .stage {
