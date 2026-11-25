@@ -1,26 +1,25 @@
 # Reproductor Coco 🥥📻
 
-Aplicación web / PWA de una sola página (SPA) estilo arcade/cartoon optimizada para **teléfono** y reproducción en **segundo plano** con audio nativo local (`<audio>`), sin dependencias externas de YouTube.
+Aplicación web / PWA de una sola página (SPA) estilo arcade/cartoon optimizada para **teléfono** y reproducción en **segundo plano** con audio nativo (`<audio>`), usando una URL directa de audio/stream o archivos locales en `assets/audio/`.
 
 - **Repositorio:** https://github.com/Rattlesnakez/reproductor-coco
 - **Web en vivo (GitHub Pages):** https://rattlesnakez.github.io/reproductor-coco/
 
-## Cómo agregar tu audio local
+## Cómo configurar tu URL de audio o stream
 
-1. Coloca tu archivo de audio comprimido dentro de [`assets/audio/`](assets/audio/README.txt) con el nombre **`cocoteo.mp3`** (`assets/audio/cocoteo.mp3`).
-   - También detecta automáticamente `cocoteo.m4a` o `cocoteo.ogg` si no existe `.mp3` (se recomienda `.mp3` por compatibilidad total en iPhone, Android y escritorio).
-2. **¿Prefieres varios clips?** Guarda tus clips dentro de `assets/audio/` y agrega sus rutas al arreglo `AUDIO_TRACKS` al inicio de `app.js`.
-3. **Límite de 100 MB en GitHub:** Si tu pista dura ~2h 12m y supera los 100 MB, comprímela antes con `ffmpeg` (a 64 kbps queda en ~63 MB):
+Puedes conectar cualquier archivo directo (`.mp3`, `.m4a`, `.ogg`) o stream de radio en vivo de 3 formas:
 
-```bash
-ffmpeg -i "tu_audio_original.mp3" -vn -ac 2 -b:a 64k assets/audio/cocoteo.mp3
-```
+1. **Desde la propia app (botón 🔗):** Toca el ícono discreto de enlace debajo del reproductor, pega la URL y pulsa **Guardar y sonar** (se guarda automáticamente en el navegador/teléfono con `localStorage`).
+2. **En el código o por parámetro web:**
+   - Para dejarla fija para todos los dispositivos, pega la URL en `DEFAULT_AUDIO_URL` al inicio de [`app.js`](app.js).
+   - O abre la web pasando `?url=https://tu-servidor.com/cocoteo.mp3`.
+3. **Archivo local en el repositorio:** Si prefieres alojar el archivo dentro de [`assets/audio/`](assets/audio/README.txt), guárdalo como `assets/audio/cocoteo.mp3` (o lista varios clips en `AUDIO_TRACKS` dentro de `app.js`).
 
-## Reproducción en segundo plano y pantalla bloqueada
+## Reproducción en segundo plano y pantalla de bloqueo
 
-- Al usar `<audio>` nativo persistente, el audio continúa reproduciéndose al cambiar de pestaña, minimizar la PWA o bloquear el teléfono.
-- Integra la **Media Session API** con título **`Cocoteo FM`**, artista **`Radio en vivo`** y la carátula del logo para controlar **Play**, **Pausa** y **Siguiente** (salto a otro momento aleatorio) directamente desde la pantalla de bloqueo o audífonos.
-- Incluye Service Worker (`sw.js`) y `manifest.webmanifest` para instalarla en la pantalla de inicio del celular sin interferir con el streaming por rangos de bytes (`HTTP 206`) del audio.
+- Con una URL directa de audio/stream (sin reproductores externos de video), el `<audio>` nativo **no se detiene** al cambiar de pestaña, minimizar la PWA o bloquear la pantalla del celular.
+- La **Media Session API** bloquea la tarjeta multimedia del teléfono al nombre **`Cocoteo FM`** / **`Radio en vivo`** y al ícono oficial de la aplicación (`icon-192.png` / `icon-512.png`) en lugar de mostrar portadas de video o nombres de archivo, junto con controles de **Play**, **Pausa** y **Siguiente** (salto a otro momento aleatorio).
+- Incluye Service Worker (`sw.js`) y `manifest.webmanifest` para instalarla en la pantalla de inicio sin interferir con el streaming ni con peticiones `HTTP 206 Partial Content`.
 
 ## Cómo ejecutar en local
 

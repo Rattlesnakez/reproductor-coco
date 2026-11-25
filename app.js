@@ -2,10 +2,13 @@
   'use strict';
 
   /**
-   * Lista de archivos de audio locales dentro de assets/audio/.
-   * - Archivo único largo: deja ['./assets/audio/cocoteo.mp3']
-   * - Múltiples clips: agrega varias rutas, por ejemplo:
-   *   ['./assets/audio/clip-1.mp3', './assets/audio/clip-2.mp3']
+   * URL directa permanente opcional (p. ej. 'https://tu-servidor.com/cocoteo.mp3' o stream Icecast).
+   * Déjala vacía ('') para configurarla desde el botón de enlace en la app o usar assets/audio/.
+   */
+  const DEFAULT_AUDIO_URL = '';
+
+  /**
+   * Lista de archivos locales de respaldo dentro de assets/audio/.
    */
   const AUDIO_TRACKS = ['./assets/audio/cocoteo.mp3'];
   const DEFAULT_FORMAT_FALLBACKS = [
@@ -14,7 +17,9 @@
     './assets/audio/cocoteo.ogg',
   ];
 
+  const STORAGE_KEY_URL = 'reproductor_coco_audio_url';
   const MAX_HISTORY = 20;
+  const YOUTUBE_HOST_RE = /(^|\.)(youtube\.com|youtu\.be)$/i;
 
   const brandLogo = document.getElementById('brand-logo');
   const logoFallback = document.getElementById('logo-fallback');
@@ -25,6 +30,16 @@
   const statusText = document.getElementById('status-text');
   const pauseBtn = document.getElementById('pause-btn');
   const muteBtn = document.getElementById('mute-btn');
+  const sourceBtn = document.getElementById('source-btn');
+  const sourceModal = document.getElementById('source-modal');
+  const sourceCloseBtn = document.getElementById('source-close-btn');
+  const sourceForm = document.getElementById('source-form');
+  const sourceUrlInput = document.getElementById('source-url-input');
+  const sourceModalError = document.getElementById('source-modal-error');
+  const sourceResetBtn = document.getElementById('source-reset-btn');
+  const sourceModalBackdrop = sourceModal
+    ? sourceModal.querySelector('[data-close-modal]')
+    : null;
   const radioAudio = document.getElementById('radio-audio');
 
   const iconPause = pauseBtn.querySelector('.icon-pause');
@@ -35,6 +50,7 @@
   const isDefaultSingleTrack =
     AUDIO_TRACKS.length === 1 && AUDIO_TRACKS[0] === './assets/audio/cocoteo.mp3';
 
+  let configuredUrl = '';
   let activeTracks = AUDIO_TRACKS.slice();
   let currentTrackIndex = 0;
   let fallbackQueue = [];
@@ -70,6 +86,130 @@
     if (brandLogo.complete && brandLogo.naturalWidth === 0) {
       activateLogoFallback();
     }
+  }
+
+  function validateAudioUrl(raw) {
+    const trimmed = String(raw || '').trim();
+    if (!trimmed) {
+      return { valid: false, error: 'Ingresa una URL de audio.' };
+    }
+    if (/\s/.test(trimmed) || trimmed.startsWith('//')) {
+      return {
+        valid: false,
+        error: 'Usa una URL válida que empiece con https://, http:// o una ruta local.',
+      };
+    }
+
+    if (trimmed.startsWith('./') || trimmed.startsWith('/')) {
+      return { valid: true, url: trimmed };
+    }
+
+    let parsed;
+    try {
+      parsed = new URL(trimmed);
+    } catch {
+      return {
+        valid: false,
+        error: 'Usa una URL válida que empiece con https://, http:// o una ruta local.',
+      };
+    }
+
+    if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+      return {
+        valid: false,
+        error: 'Usa una URL válida que empiece con https://, http:// o una ruta local.',
+      };
+    }
+
+    if (YOUTUBE_HOST_RE.test(parsed.hostname)) {
+      return {
+        valid: false,
+        error:
+          'Los enlaces de YouTube bloquean el segundo plano en móvil y muestran su propia portada. Pega una URL directa de .mp3, .m4a, .ogg o stream de radio.',
+      };
+    }
+
+    return { valid: true, url: parsed.href };
+  }
+
+  function readSavedAudioUrl() {
+    try {
+      return window.localStorage.getItem(STORAGE_KEY_URL) || '';
+    } catch {
+      return '';
+    }
+  }
+
+  function writeSavedAudioUrl(url) {
+    try {
+      if (url) {
+        window.localStorage.setItem(STORAGE_KEY_URL, url);
+      } else {
+        window.localStorage.removeItem(STORAGE_KEY_URL);
+      }
+    } catch {
+      // Ignorado si localStorage no está disponible
+    }
+  }
+
+  function isCustomUrlActive() {
+    return Boolean(configuredUrl);
+  }
+
+  function updateSourceButtonUI() {
+    if (!sourceBtn) return;
+    const active = isCustomUrlActive();
+    sourceBtn.classList.toggle('is-active', active);
+    sourceBtn.setAttribute('aria-pressed', String(active));
+  }
+
+  function resolveInitialAudioConfig() {
+    let queryUrl = '';
+    try {
+      queryUrl = new URLSearchParams(window.location.search).get('url') || '';
+    } catch {
+      queryUrl = '';
+    }
+
+    if (queryUrl) {
+      const checkedQuery = validateAudioUrl(queryUrl);
+      if (checkedQuery.valid) {
+        configuredUrl = checkedQuery.url;
+        activeTracks = [checkedQuery.url];
+        writeSavedAudioUrl(checkedQuery.url);
+        updateSourceButtonUI();
+        return;
+      }
+    }
+
+    const saved = readSavedAudioUrl();
+    if (saved) {
+      const checkedSaved = validateAudioUrl(saved);
+      if (checkedSaved.valid) {
+        configuredUrl = checkedSaved.url;
+        activeTracks = [checkedSaved.url];
+        updateSourceButtonUI();
+        return;
+      }
+    }
+
+    if (DEFAULT_AUDIO_URL.trim()) {
+      const checkedDefault = validateAudioUrl(DEFAULT_AUDIO_URL);
+      if (checkedDefault.valid) {
+        configuredUrl = checkedDefault.url;
+        activeTracks = [checkedDefault.url];
+        updateSourceButtonUI();
+        return;
+      }
+    }
+
+    configuredUrl = '';
+    activeTracks = AUDIO_TRACKS.slice();
+    updateSourceButtonUI();
+  }
+
+  function isLiveStreamDuration(duration) {
+    return duration === Infinity;
   }
 
   function formatTime(totalSeconds) {
@@ -266,6 +406,19 @@
     const current = Number.isFinite(radioAudio.currentTime) ? radioAudio.currentTime : 0;
     const formatted = formatTime(current);
 
+    if (isLiveStreamDuration(radioAudio.duration)) {
+      if (isMuted) {
+        statusText.textContent = '🔇 Silenciado · En vivo';
+      } else if (isPaused || radioAudio.paused) {
+        statusText.textContent = '⏸️ En pausa · En vivo';
+      } else if (current >= 1) {
+        statusText.textContent = `📻 En vivo · ${formatted}`;
+      } else {
+        statusText.textContent = '📻 En vivo · Cocoteo FM';
+      }
+      return;
+    }
+
     if (isMuted) {
       statusText.textContent = `🔇 Silenciado · ${formatted}`;
     } else if (isPaused || radioAudio.paused) {
@@ -295,6 +448,32 @@
     if (temporarilyMutedForSeek && radioAudio) {
       temporarilyMutedForSeek = false;
       radioAudio.muted = isMuted;
+    }
+  }
+
+  function applyMediaSessionMetadata() {
+    if (!('mediaSession' in navigator) || typeof MediaMetadata !== 'function') return;
+
+    try {
+      navigator.mediaSession.metadata = new MediaMetadata({
+        title: 'Cocoteo FM',
+        artist: 'Radio en vivo',
+        album: 'Reproductor Coco',
+        artwork: [
+          {
+            src: new URL('./icon-192.png', window.location.href).href,
+            sizes: '192x192',
+            type: 'image/png',
+          },
+          {
+            src: new URL('./icon-512.png', window.location.href).href,
+            sizes: '512x512',
+            type: 'image/png',
+          },
+        ],
+      });
+    } catch {
+      // Ignorado si MediaMetadata falla
     }
   }
 
@@ -335,34 +514,7 @@
   function setupMediaSession() {
     if (!('mediaSession' in navigator)) return;
 
-    try {
-      if (typeof MediaMetadata === 'function') {
-        navigator.mediaSession.metadata = new MediaMetadata({
-          title: 'Cocoteo FM',
-          artist: 'Radio en vivo',
-          album: 'Reproductor Coco',
-          artwork: [
-            {
-              src: new URL('./icon-192.png', window.location.href).href,
-              sizes: '192x192',
-              type: 'image/png',
-            },
-            {
-              src: new URL('./icon-512.png', window.location.href).href,
-              sizes: '512x512',
-              type: 'image/png',
-            },
-            {
-              src: new URL('./logo.png', window.location.href).href,
-              sizes: '304x277',
-              type: 'image/png',
-            },
-          ],
-        });
-      }
-    } catch {
-      // Ignorado si MediaMetadata falla
-    }
+    applyMediaSessionMetadata();
 
     const handlers = {
       play: () => {
@@ -439,6 +591,7 @@
 
   function pushTuneHistory() {
     if (!hasStarted || !radioAudio || !radioAudio.getAttribute('src')) return;
+    if (isLiveStreamDuration(radioAudio.duration)) return;
     const current = Number.isFinite(radioAudio.currentTime) ? Math.floor(radioAudio.currentTime) : 0;
     tuneHistory.push({ trackIndex: currentTrackIndex, time: current });
     if (tuneHistory.length > MAX_HISTORY) {
@@ -447,7 +600,7 @@
   }
 
   function prepareFallbackQueue(initialUrl) {
-    if (!isDefaultSingleTrack) {
+    if (isCustomUrlActive() || !isDefaultSingleTrack) {
       fallbackQueue = [];
       return;
     }
@@ -554,10 +707,110 @@
     updateLiveTimestamp();
   }
 
+  function showSourceModalError(message) {
+    if (!sourceModalError) return;
+    if (message) {
+      sourceModalError.textContent = message;
+      setVisible(sourceModalError, true);
+    } else {
+      sourceModalError.textContent = '';
+      setVisible(sourceModalError, false);
+    }
+  }
+
+  function isSourceModalOpen() {
+    return Boolean(sourceModal && !sourceModal.hasAttribute('hidden'));
+  }
+
+  function openSourceModal() {
+    if (!sourceModal) return;
+    if (sourceUrlInput) {
+      sourceUrlInput.value = configuredUrl || '';
+    }
+    showSourceModalError('');
+    setVisible(sourceModal, true);
+    if (sourceUrlInput) {
+      window.setTimeout(() => sourceUrlInput.focus(), 20);
+    }
+  }
+
+  function closeSourceModal() {
+    if (!sourceModal) return;
+    setVisible(sourceModal, false);
+    showSourceModalError('');
+    if (sourceBtn) {
+      sourceBtn.focus();
+    }
+  }
+
+  function handleSourceFormSubmit(event) {
+    event.preventDefault();
+    if (!sourceUrlInput) return;
+
+    const result = validateAudioUrl(sourceUrlInput.value);
+    if (!result.valid) {
+      showSourceModalError(result.error);
+      sourceUrlInput.focus();
+      return;
+    }
+
+    configuredUrl = result.url;
+    activeTracks = [result.url];
+    currentTrackIndex = 0;
+    lastTargetTime = null;
+    tuneHistory.length = 0;
+    writeSavedAudioUrl(result.url);
+    updateSourceButtonUI();
+
+    if (radioAudio) {
+      radioAudio.pause();
+      radioAudio.removeAttribute('src');
+    }
+
+    closeSourceModal();
+    tuneRandomMoment();
+  }
+
+  function handleSourceReset() {
+    writeSavedAudioUrl('');
+    tuneHistory.length = 0;
+    lastTargetTime = null;
+    currentTrackIndex = 0;
+
+    if (DEFAULT_AUDIO_URL.trim()) {
+      const checkedDefault = validateAudioUrl(DEFAULT_AUDIO_URL);
+      configuredUrl = checkedDefault.valid ? checkedDefault.url : '';
+      activeTracks = configuredUrl ? [configuredUrl] : AUDIO_TRACKS.slice();
+    } else {
+      configuredUrl = '';
+      activeTracks = AUDIO_TRACKS.slice();
+    }
+
+    updateSourceButtonUI();
+
+    if (radioAudio) {
+      radioAudio.pause();
+      radioAudio.removeAttribute('src');
+      radioAudio.load();
+    }
+
+    resetToIdleUnavailable('📻 Presiona para sintonizar');
+    closeSourceModal();
+  }
+
   function applyPendingSeek() {
     if (!radioAudio || pendingSeekMode === null) return;
 
     const duration = radioAudio.duration;
+    if (isLiveStreamDuration(duration)) {
+      pendingSeekMode = null;
+      lastTargetTime = null;
+      clearTemporarySeekMute();
+      applyMediaSessionMetadata();
+      updateLiveTimestamp();
+      return;
+    }
+
     if (!Number.isFinite(duration) || duration <= 0) return;
 
     const seekable = radioAudio.seekable;
@@ -583,12 +836,16 @@
     } else {
       clearTemporarySeekMute();
     }
+    applyMediaSessionMetadata();
     updateMediaSessionPositionState(true);
   }
 
   // Eventos nativos del reproductor HTML5 <audio>
   if (radioAudio) {
-    radioAudio.addEventListener('loadedmetadata', applyPendingSeek);
+    radioAudio.addEventListener('loadedmetadata', () => {
+      applyMediaSessionMetadata();
+      applyPendingSeek();
+    });
     radioAudio.addEventListener('canplay', applyPendingSeek);
 
     radioAudio.addEventListener('seeked', () => {
@@ -607,6 +864,7 @@
       }
       updatePauseButtonUI(false);
       setVisualState('playing');
+      applyMediaSessionMetadata();
       updateMediaSessionPlaybackState('playing');
       tuneBtnLabel.textContent = 'CAMBIAR MOMENTO';
       updateLiveTimestamp();
@@ -667,8 +925,10 @@
       radioAudio.removeAttribute('src');
       radioAudio.load();
 
-      if (isDefaultSingleTrack) {
-        resetToIdleUnavailable('📂 Coloca tu audio en assets/audio/cocoteo.mp3');
+      if (isCustomUrlActive()) {
+        resetToIdleUnavailable('⚠️ No se pudo reproducir esa URL de audio');
+      } else if (isDefaultSingleTrack) {
+        resetToIdleUnavailable('🔗 Configura una URL de audio (botón de enlace)');
       } else {
         resetToIdleUnavailable('📂 No se encontró el archivo de audio en assets/audio/');
       }
@@ -686,6 +946,7 @@
     } else {
       updatePauseButtonUI(false);
       setVisualState('playing');
+      applyMediaSessionMetadata();
       updateMediaSessionPlaybackState('playing');
     }
     updateLiveTimestamp();
@@ -704,7 +965,30 @@
   pauseBtn.addEventListener('click', togglePause);
   muteBtn.addEventListener('click', toggleMute);
 
+  if (sourceBtn) {
+    sourceBtn.addEventListener('click', openSourceModal);
+  }
+  if (sourceCloseBtn) {
+    sourceCloseBtn.addEventListener('click', closeSourceModal);
+  }
+  if (sourceModalBackdrop) {
+    sourceModalBackdrop.addEventListener('click', closeSourceModal);
+  }
+  if (sourceForm) {
+    sourceForm.addEventListener('submit', handleSourceFormSubmit);
+  }
+  if (sourceResetBtn) {
+    sourceResetBtn.addEventListener('click', handleSourceReset);
+  }
+
   document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && isSourceModalOpen()) {
+      closeSourceModal();
+      return;
+    }
+
+    if (isSourceModalOpen()) return;
+
     const tag = event.target && event.target.tagName;
     if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
 
@@ -715,6 +999,7 @@
     }
   });
 
+  resolveInitialAudioConfig();
   setupMediaSession();
 
   if ('serviceWorker' in navigator && /^https?:$/.test(window.location.protocol)) {

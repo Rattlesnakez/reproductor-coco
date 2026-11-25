@@ -9,13 +9,13 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Reproductor Coco">
   <title>Reproductor Coco</title>
-  <link rel="manifest" href="./manifest.webmanifest?v=3">
+  <link rel="manifest" href="./manifest.webmanifest?v=4">
   <link rel="apple-touch-icon" sizes="180x180" href="./apple-touch-icon.png?v=2">
   <link rel="icon" type="image/png" sizes="512x512" href="./icon-512.png?v=2">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Titan+One&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="./styles.css?v=3">
+  <link rel="stylesheet" href="./styles.css?v=4">
 </head>
 <body>
   <div class="bg-gradient" aria-hidden="true"></div>
@@ -230,11 +230,57 @@
           <path d="M17.5 9.5L21.5 14.5M21.5 9.5L17.5 14.5" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"/>
         </svg>
       </button>
+
+      <button
+        id="source-btn"
+        class="icon-btn"
+        type="button"
+        aria-label="Configurar URL de audio"
+        title="Configurar URL de audio"
+      >
+        <svg class="icon-btn__svg" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M10.5 13.5a5 5 0 0 0 7.07.0l2.12-2.12a5 5 0 0 0-7.07-7.07l-1.2 1.2" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M13.5 10.5a5 5 0 0 0-7.07 0L4.3 12.62a5 5 0 1 0 7.07 7.07l1.2-1.2" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
     </div>
   </main>
 
+  <div id="source-modal" class="source-modal" role="dialog" aria-modal="true" aria-labelledby="source-modal-title" hidden>
+    <div class="source-modal__backdrop" data-close-modal></div>
+    <div class="source-modal__card">
+      <div class="source-modal__header">
+        <h2 id="source-modal-title" class="source-modal__title">URL de audio</h2>
+        <button id="source-close-btn" class="source-modal__close" type="button" aria-label="Cerrar">✕</button>
+      </div>
+      <p class="source-modal__hint">
+        Pega una URL directa de audio (<code>.mp3</code>, <code>.m4a</code>, <code>.ogg</code> o stream de radio) para reproducir en segundo plano con el ícono y nombre de <strong>Cocoteo FM</strong>.
+      </p>
+      <form id="source-form" class="source-modal__form" novalidate>
+        <input
+          id="source-url-input"
+          class="source-modal__input"
+          type="url"
+          inputmode="url"
+          placeholder="https://ejemplo.com/cocoteo.mp3"
+          autocomplete="off"
+          spellcheck="false"
+        >
+        <p id="source-modal-error" class="source-modal__error" role="alert" hidden></p>
+        <div class="source-modal__actions">
+          <button id="source-save-btn" class="source-modal__btn source-modal__btn--primary" type="submit">
+            Guardar y sonar
+          </button>
+          <button id="source-reset-btn" class="source-modal__btn source-modal__btn--ghost" type="button">
+            Restablecer
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <audio id="radio-audio" preload="metadata" playsinline></audio>
 
-  <script src="./app.js?v=3" defer></script>
+  <script src="./app.js?v=4" defer></script>
 </body>
 </html>
